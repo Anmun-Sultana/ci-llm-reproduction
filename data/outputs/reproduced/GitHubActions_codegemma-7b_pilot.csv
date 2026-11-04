@@ -1,0 +1,211 @@
+"ID","URL","Title","Description","Code","LLM_YML_Output","Time"
+"1","https://docs.github.com/en/actions/use-cases-and-examples/deploying/deploying-net-to-azure-app-service","Deploying .NET to Azure App Service - Creating the workflow","Once you've completed the prerequisites, you can proceed with creating the workflow. The following example workflow demonstrates how to build and deploy a .NET project to Azure App Service when there is a push to the main branch. Ensure that you set AZURE_WEBAPP_NAME in the workflow env key to the name of the web app you created. If the path to your project is not the repository root, change AZURE_WEBAPP_PACKAGE_PATH . If you use a version of .NET other than 5 , change DOTNET_VERSION . If you configured a deployment environment, change the value of environment to be the name of your environment. If you did not configure an environment or if your workflow is in a private repository and you do not use GitHub Enterprise Cloud, delete the environment key.","# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# GitHub recommends pinning actions to a commit SHA.
+# To get a newer version, you will need to update the SHA.
+# You can also reference a tag or branch, but the action may change without warning.
+
+name: Build and deploy ASP.Net Core app to an Azure Web App
+
+env:
+  AZURE_WEBAPP_NAME: MY_WEBAPP_NAME   # set this to your application's name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'      # set this to the path to your web app project, defaults to the repository root
+  DOTNET_VERSION: '5'                 # set this to the .NET Core version to use
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Set up dependency caching for faster builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build with dotnet
+        run: dotnet build --configuration Release
+
+      - name: dotnet publish
+        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/myapp
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@85270a1854658d167ab239bce43949edb336fa7c
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}","name: Deploy .NET to Azure App Service
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 5.0.x
+
+      - name: Build and publish
+        run: dotnet publish -c Release --output publish
+
+      - name: Deploy to Azure App Service
+        uses: azure/app-service-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish","193.02"
+"2","https://docs.github.com/en/actions/writing-workflows/about-workflows?learn=getting_started&learnProduct=actions","About workflows - Advanced workflow features - Storing secrets","This section briefly describes some of the advanced features of GitHub Actions that help you create more complex workflows. If your workflows use sensitive data, such as passwords or certificates, you can save these in GitHub as secrets and then use them in your workflows as environment variables. This means that you will be able to create and share workflows without having to embed sensitive values directly in the workflow's YAML source. This example job demonstrates how to reference an existing secret as an environment variable, and send it as a parameter to an example command.","jobs:
+  example-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve secret
+        env:
+          super_secret: ${{ secrets.SUPERSECRET }}
+        run: |
+          example-command ""$super_secret""","name: Secret Workflow
+
+on:
+  push
+
+env:
+  MY_SECRET: ${{ secrets.MY_SECRET }}
+
+jobs:
+  secret-job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print Secret
+        run: echo $MY_SECRET","63.92"
+"3","https://docs.github.com/en/actions/writing-workflows/about-workflows?learn=getting_started&learnProduct=actions","About workflows - Advanced workflow features - Creating dependent jobs","This section briefly describes some of the advanced features of GitHub Actions that help you create more complex workflows. By default, the jobs in your workflow all run in parallel at the same time. If you have a job that must only run after another job has completed, you can use the needs keyword to create this dependency. If one of the jobs fails, all dependent jobs are skipped; however, if you need the jobs to continue, you can define this using the if conditional statement. In this example, the setup , build , and test jobs run in series, with build and test being dependent on the successful completion of the job that precedes them:","jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./setup_server.sh
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build_server.sh
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./test_server.sh","name: Series of Jobs
+
+on:
+  push
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest","45.45"
+"4","https://docs.github.com/en/actions/writing-workflows/about-workflows?learn=getting_started&learnProduct=actions","About workflows - Advanced workflow features - Using a matrix","This section briefly describes some of the advanced features of GitHub Actions that help you create more complex workflows. A matrix strategy lets you use variables in a single job definition to automatically create multiple job runs that are based on the combinations of the variables. For example, you can use a matrix strategy to test your code in multiple versions of a language or on multiple operating systems. The matrix is created using the strategy keyword, which receives the build options as an array. For example, this matrix will run the job multiple times, using different versions of Node.js:","jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [14, 16]
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}","name: Matrix Workflow
+
+on:
+  push
+
+jobs:
+  matrix-job:
+    strategy:
+      matrix:
+        node-version: [14, 16, 18]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm install
+      - run: npm test","78.61"
+"5","https://docs.github.com/en/actions/writing-workflows/about-workflows?learn=getting_started&learnProduct=actions","About workflows - Advanced workflow features - Caching dependencies","This section briefly describes some of the advanced features of GitHub Actions that help you create more complex workflows. If your jobs regularly reuse dependencies, you can consider caching these files to help improve performance. Once the cache is created, it is available to all workflows in the same repository. This example demonstrates how to cache the ~/.npm directory:","jobs:
+  example-job:
+    steps:
+      - name: Cache node modules
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-","name: Cache NPM Dependencies
+
+on:
+  push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache NPM Dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-","85.74"
